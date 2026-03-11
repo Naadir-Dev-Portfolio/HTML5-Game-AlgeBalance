@@ -1,0 +1,379 @@
+<!--
+Project: Algebraverse
+Created by Naadir.
+
+Disclaimer: This project was built using AI-assisted coding LLMs under my direction and supervision.
+It is included in my portfolio to demonstrate my ability to effectively leverage language models to design, structure, and produce interactive, functional web applications.
+Algebraverse is an adaptive, gamified algebra training tool featuring endless, tiered problem challenges with built-in hints and calculator support.
+This highlights my skills in conceptualizing educational experiences, guiding AI-driven development, and delivering polished, engaging software.
+-->
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Algebraverse — Endless Challenge</title>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mathjs@11.9.1/lib/browser/math.js"></script>
+  <style>
+  :root {
+    --bg:#121212;--fg:#eee;--card:#1e1e1e;--accent:#7ab4ff;
+    --good:#66bb6a;--bad:#ef5350;--hi:#ffd54f;--coin:#ffb300
+  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:'Manrope',sans-serif}
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    display: flex;flex-direction:column;align-items:center;
+    min-height:100vh;padding:1rem;overflow:hidden;
+  }
+  /* bubble background */
+  #backgroundParticles {
+    position: fixed; top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    z-index: -1; pointer-events: none;
+  }
+  header {
+    position: relative;z-index:2;
+    display:flex;gap:1.2rem;font-size:1.1rem;
+  }
+  header span { margin-right:.8rem }
+  header label { cursor:pointer }
+  /* info & instructions bottom toggles */
+  #infoToggle, #toggleInstructions {
+    position: fixed; bottom:24px; width:40px; height:40px;
+    background:var(--card); color:var(--fg); border:none;
+    border-radius:50%; font-size:1.3rem; cursor:pointer; z-index:3;
+  }
+  #infoToggle { left:24px }
+  #toggleInstructions { right:24px; width:auto; padding:8px 12px; border-radius:8px }
+  #infoBox, #instructions {
+    position: fixed; bottom:68px; width:300px; max-width:90vw;
+    max-height:0; overflow:hidden; background:var(--card);
+    border:0 solid var(--accent); border-radius:12px;
+    box-shadow:0 4px 24px rgba(0,0,0,0.5); color:var(--fg);
+    padding:0 16px; z-index:3;
+    transition:max-height .4s ease,padding .3s ease,border-width .3s ease;
+  }
+  #infoBox.expanded, #instructions.expanded {
+    max-height:300px; padding:16px; border-width:1px;
+  }
+  #infoBox p, #instructions p, #infoBox ul, #instructions ul {
+    margin-bottom:.8em; line-height:1.4;
+  }
+  #infoBox ul, #instructions ul { padding-left:1.2em }
+  /* card */
+  .card {
+    position:relative; z-index:2;
+    background:var(--card); padding:1.2rem;
+    border-radius:8px; box-shadow:0 3px 14px rgba(0,0,0,0.5);
+    width:min(760px,95%); display:flex;flex-direction:column;gap:1rem;
+  }
+  .card h2 { color:var(--accent); font-size:1.4rem }
+  .problem { font-size:1.2rem; line-height:1.4 }
+  .inputs { display:flex; flex-wrap:wrap; gap:.6rem }
+  .inputs input {
+    background:#2a2a2a; border:1px solid var(--accent);
+    color:var(--fg); padding:.5rem .8rem; border-radius:4px;
+    font-size:1rem; width:7.2rem;
+  }
+  .actions { display:flex;align-items:center;gap:.8rem }
+  .actions button {
+    background:var(--accent); color:var(--bg);
+    border:none;padding:.5rem 1rem;border-radius:6px;
+    cursor:pointer;transition:transform .1s;
+  }
+  .actions button:hover{transform:scale(1.05)}
+  .result { min-height:1.4em; font-weight:600 }
+  .hint { background:var(--hi); color:#000; padding:.6rem;
+    border-radius:6px; display:none }
+  .flash{animation:flash .5s}
+  @keyframes flash{50%{background:var(--good);color:#fff}}
+  /* scratch calculator */
+  .calc {
+    position:relative; z-index:2;
+    background:var(--card); border:2px dashed var(--accent);
+    border-radius:8px; padding:.6rem; display:flex;
+    align-items:center;gap:.6rem;font-size:.95rem;
+  }
+  .calc input, .calc button {
+    background:#2a2a2a;border:1px solid var(--accent);
+    color:var(--fg);padding:.4rem .8rem;border-radius:4px;
+  }
+  .calc button { cursor:pointer }
+  </style>
+</head>
+<body>
+
+  <canvas id="backgroundParticles"></canvas>
+
+  <header>
+    <span>Problem <span id="pn">1</span></span>
+    <span>Tier <span id="tier">1</span></span>
+    <span>XP <span id="xp">0</span></span>
+    <span>Coins 💰 <span id="coins">0</span></span>
+    <span>Lives ♥ <span id="lives">3</span></span>
+  </header>
+
+  <div class="card" id="card">
+    <h2 id="title"></h2>
+    <div id="prob" class="problem"></div>
+    <div id="inArea" class="inputs"></div>
+    <div class="actions">
+      <button id="check">Check</button>
+      <button id="hint">Hint</button>
+      <span id="stepInfo"></span>
+    </div>
+    <div id="res" class="result"></div>
+    <div id="hintBox" class="hint"></div>
+  </div>
+
+  <section class="calc">
+    🧮 Scratch-pad:
+    <input id="calcIn" placeholder="(3+5)/2">
+    <button id="calcBtn">=</button>
+    <span id="calcOut"></span>
+    <button id="insBtn">⇢</button>
+  </section>
+
+	<button id="infoToggle">ⓘ</button>
+	<div id="infoBox">
+	  <p><b>Algebraverse</b> was created by <b>Naadir</b> in 2024 with the help of <b>GPT-4o</b>.</p>
+	  <ul>
+		<li>Hints & built-in calculator</li>
+		<li>Earn XP & coins, avoid running out of lives</li>
+		<li>No level labels—just keep solving!</li>
+		<li>Tech stack:
+		  <ul>
+			<li>HTML5 & CSS3 (responsive, custom properties, animations)</li>
+			<li>Vanilla JavaScript (ES6+), no frameworks</li>
+			<li><a href="https://mathjs.org/" target="_blank">math.js</a> for CAS operations</li>
+			<li>Canvas 2D for animated bubble background</li>
+			<li>LocalStorage for persisting XP, coins, theme, and high score</li>
+			<li>Google Fonts (Manrope) for clean typography</li>
+		  </ul>
+		</li>
+	  </ul>
+	</div>
+
+
+  <button id="toggleInstructions">▶ Instructions</button>
+  <div id="instructions">
+    <p>Solve each problem in turn:</p>
+    <ul>
+      <li>Type your answer(s) and click “Check”.</li>
+      <li>Use “Hint” for step guidance (costs XP).</li>
+      <li>Use the scratch-pad calculator for help.</li>
+      <li>Earn coins for correct answers, lose a life for mistakes.</li>
+      <li>Game ends when lives reach 0.</li>
+    </ul>
+  </div>
+
+  <script>
+  /* Bubble background effect */
+  const canvas = document.getElementById('backgroundParticles');
+  const ctx = canvas.getContext('2d');
+  let particles = [];
+  function resizeParticles() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  function initParticles() {
+    resizeParticles();
+    particles = [];
+    for (let i = 0; i < 40; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        r: 10 + Math.random() * 30,
+        d: 0.5 + Math.random() * 1.5,
+        a: Math.random() * Math.PI * 2
+      });
+    }
+  }
+  function animateParticles() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (let p of particles) {
+      ctx.save();
+      ctx.globalAlpha = 0.1 + 0.1 * Math.sin(Date.now()/1000 + p.a);
+      const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+      grad.addColorStop(0, "#fff");
+      grad.addColorStop(1, "#90caf9");
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, 2 * Math.PI);
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.restore();
+      p.y -= p.d;
+      if (p.y + p.r < 0) {
+        p.y = canvas.height + p.r;
+        p.x = Math.random() * canvas.width;
+      }
+    }
+    requestAnimationFrame(animateParticles);
+  }
+  window.addEventListener('resize', initParticles);
+  document.addEventListener('DOMContentLoaded', ()=>{
+    initParticles();
+    animateParticles();
+  });
+
+  /* Game logic */
+  const math = window.math, $ = s=>document.querySelector(s);
+  let problemNum=1,xp=0,coins=0,lives=3,hintIdx=0,cur;
+
+  function getTier(){return Math.floor((problemNum-1)/10)+1}
+  function updHUD(){
+    $('#pn').textContent=problemNum;
+    $('#tier').textContent=getTier();
+    $('#xp').textContent=xp;
+    $('#coins').textContent=coins;
+    $('#lives').textContent=lives;
+  }
+  function rInt(a,b){return Math.floor(Math.random()*(b-a+1))+a;}
+
+  function probLinear(){
+    const x=rInt(-9,9)||2,a=rInt(2,9),b=rInt(-9,9),c=a*x+b;
+    return {
+      title:'Linear Equation',
+      text:`Solve for x: <b>${a}x ${b>=0?'+':''}${b} = ${c}</b>`,
+      html:`<input id="ansX" placeholder="x?">`,
+      check:v=>Math.abs(+v.x-x)<1e-6,
+      hints:[`Subtract ${b}`,`Divide by ${a}` ,`x=${x}`]
+    };
+  }
+  function probSystem(){
+    const x=rInt(-4,4),y=rInt(-4,4),
+          a=rInt(1,6),b=rInt(-6,6)||1,
+          d=rInt(1,6),e=rInt(-6,6)||1;
+    if(a===d)d++;
+    const r1=a*x+b*y,r2=d*x+e*y,
+          elim=Math.abs(a)<Math.abs(b)?'x':'y';
+    return{
+      title:'System of Equations',
+      text:`Solve:<br><b>${a}x ${b>=0?'+':''}${b}y=${r1}<br>${d}x ${e>=0?'+':''}${e}y=${r2}</b>`,
+      html:`<input id="ansX" placeholder="x?"><input id="ansY" placeholder="y?">`,
+      check:v=>Math.abs(+v.x-x)<1e-6&&Math.abs(+v.y-y)<1e-6,
+      hints:[
+        elim==='x'?'Eliminate x':'Eliminate y',
+        elim==='x'?`y=${y}`:`x=${x}`,
+        'Back-substitute',
+        `Solution: (${x},${y})`
+      ]
+    };
+  }
+  function probRational(){
+    const r=rInt(2,5);
+    return {
+      title:'Rational Expression',
+      text:`Simplify:<br><b>(x²−${r*r})/(x+${r})</b>`,
+      html:`<input id="ansE" placeholder="expr">`,
+      check:v=>math.simplify(v.e).equals(math.simplify(`x-${r}`)),
+      hints:[`Factor x²−${r*r}` ,`Cancel (x+${r})`, `x−${r}`]
+    };
+  }
+  function probAbs(){
+    const a=rInt(1,4),b=rInt(-6,6),C=rInt(3,7),
+          lo=(-C-b)/a,hi=(C-b)/a;
+    return{
+      title:'Absolute-value Inequality',
+      text:`Solve:<br><b>|${a}x${b>=0?'+':''}${b}|≤${C}</b>`,
+      html:`<input id="ansLo" placeholder="lo"><input id="ansHi" placeholder="hi">`,
+      check:v=>Math.abs(+v.lo-lo)<1e-6&&Math.abs(+v.hi-hi)<1e-6,
+      hints:[
+        `|u|≤${C}⇒−${C}≤u≤${C}`,
+        `u=${a}x${b>=0?'+':''}${b}`,
+        `x∈[${lo},${hi}]`
+      ]
+    };
+  }
+  function probLog(){
+    const p=rInt(1,4),q=rInt(1,4),k=rInt(1,3),t=2**k,
+          B=p-q,Cc=-(p*q+t),D=B*B-4*Cc,sD=Math.sqrt(D),
+          x1=((-B+sD)/2).toFixed(3),x2=((-B-sD)/2).toFixed(3);
+    return{
+      title:'Logarithmic Equation',
+      text:`Solve:<br><b>log₂(x+${p})+log₂(x−${q})=${k}</b>`,
+      html:`<input id="ans1" placeholder="s1"><input id="ans2" placeholder="s2">`,
+      check:v=>{
+        const arr=[+v.s1,+v.s2].sort(),tar=[+x1,+x2].sort();
+        return Math.abs(arr[0]-tar[0])<1e-3&&Math.abs(arr[1]-tar[1])<1e-3;
+      },
+      hints:[
+        `Combine ⇢ (x+${p})(x−${q})=${t}`,
+        `Solve quadratic`,
+        `x=${x1},${x2}`
+      ]
+    };
+  }
+  const CATS=[probLinear,probSystem,probRational,probAbs,probLog];
+
+  function newProblem(){
+    if(lives<1){ $('#res').textContent='💀 No lives—reload.';$('#check,#hint').disabled=true;return; }
+    hintIdx=0;
+    const tier=getTier(), avail=CATS.slice(0,Math.min(tier,CATS.length));
+    cur=avail[Math.floor(Math.random()*avail.length)]();
+    $('#title').textContent=cur.title;
+    $('#prob').innerHTML=cur.text;
+    $('#inArea').innerHTML=cur.html;
+    $('#res').textContent='';$('#hintBox').style.display='none';$('#stepInfo').textContent='';
+    updHUD();
+  }
+  function readVals(){
+    return {
+      x:$('#ansX')?.value.trim(),
+      y:$('#ansY')?.value.trim(),
+      e:$('#ansE')?.value.trim(),
+      lo:$('#ansLo')?.value.trim(),
+      hi:$('#ansHi')?.value.trim(),
+      s1:$('#ans1')?.value.trim(),
+      s2:$('#ans2')?.value.trim()
+    };
+  }
+  function checkAns(){
+    const v=readVals();
+    if(cur.check(v)){
+      $('#res').textContent='✔ Correct!';$('#res').style.color='var(--good)';
+      $('#card').classList.add('flash');
+      setTimeout(()=>$('#card').classList.remove('flash'),450);
+      coins+=Math.max(1,10-hintIdx*2);
+      xp+=Math.max(5,50-hintIdx*10);
+      problemNum++; newProblem();
+    } else {
+      $('#res').textContent='✖ Try again';$('#res').style.color='var(--bad)';
+      if(--lives<1){ $('#res').textContent='💀 No lives—reload.';$('#check,#hint').disabled=true; }
+      updHUD();
+    }
+  }
+  function giveHint(){
+    if(hintIdx<cur.hints.length){
+      $('#hintBox').innerHTML=cur.hints[hintIdx++];
+      $('#hintBox').style.display='block';
+      $('#stepInfo').textContent=`Hints used: ${hintIdx}`;
+    }
+  }
+  $('#check').onclick=checkAns;
+  $('#hint').onclick=giveHint;
+
+  /* calculator */
+  $('#calcBtn').onclick=()=>{
+    try{ $('#calcOut').textContent='= '+math.evaluate($('#calcIn').value) }catch{ $('#calcOut').textContent='?' }
+  };
+  $('#insBtn').onclick=()=>{
+    const out=$('#calcOut').textContent.replace(/^=\s*/,''), inp=document.activeElement;
+    if(inp&&inp.tagName==='INPUT') inp.value=out;
+  };
+
+  /* toggles */
+  $('#infoToggle').onclick=()=>$('#infoBox').classList.toggle('expanded');
+  $('#toggleInstructions').onclick=e=>{
+    const inst=$('#instructions'),open=inst.classList.toggle('expanded');
+    e.target.textContent=(open?'▼ ':'▶ ')+'Instructions';
+  };
+
+  document.addEventListener('DOMContentLoaded',newProblem);
+  window.addEventListener('resize',initParticles);
+  </script>
+</body>
+</html>
