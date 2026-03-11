@@ -1,2 +1,2 @@
-# HTML5-Game-AlgeBalance
+# AlgeBalance
 A Visual Algebra Puzzle Game
