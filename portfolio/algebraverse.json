@@ -4,7 +4,7 @@
   "n": 3,
   "title": "AlgebraVerse",
   "img": "algebraverseScreen.webp",
-  "desc": "Progressive algebra challenge system — from basic equations to multi-step problem solving, with difficulty scaling.",
+  "desc": "Progressive algebra challenge system, from basic equations to multi-step problem solving, with difficulty scaling.",
   "code": "https://github.com/Naadir-Dev-Portfolio/Algebraverse/blob/main/index.html",
   "demo": "https://algebraverse-by-naadir.netlify.app/",
   "tags": [
